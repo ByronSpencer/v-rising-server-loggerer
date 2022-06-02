@@ -1,0 +1,31 @@
+{
+  "name": "v_rising_server_loggerer",
+  "version": "0.1.0",
+  "description": "A gulp driven visualizer for V Rising dedicated server logs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ByronSpencer/v-rising-server-loggerer.git"
+  },
+  "keywords": [
+    "V Rising",
+    "dedicated",
+    "server",
+    "gulp",
+    "logger"
+  ],
+  "author": "Byron Spencer",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ByronSpencer/v-rising-server-loggerer/issues"
+  },
+  "homepage": "https://github.com/ByronSpencer/v-rising-server-loggerer#readme",
+  "devDependencies": {
+    "glob": "^8.0.3",
+    "gulp": "^4.0.2",
+    "gulp-tap": "^2.0.0"
+  }
+}
