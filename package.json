@@ -4,7 +4,7 @@
   "description": "A gulp driven visualizer for V Rising dedicated server logs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "gulp": "gulp"
   },
   "repository": {
     "type": "git",
@@ -24,8 +24,10 @@
   },
   "homepage": "https://github.com/ByronSpencer/v-rising-server-loggerer#readme",
   "devDependencies": {
+    "axios": "^0.27.2",
     "glob": "^8.0.3",
     "gulp": "^4.0.2",
+    "gulp-chmod": "^3.0.0",
     "gulp-tap": "^2.0.0"
   }
 }
