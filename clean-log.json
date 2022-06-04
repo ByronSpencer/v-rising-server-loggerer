@@ -1,0 +1,12 @@
+{
+    "users": [
+        {
+            "characterName": "some chararcter",
+            "status": "online",
+            "characterId": 389249,
+            "steamId": 39409240923,
+            "lastSession": 39024924,
+            "lastLogIndex": 43938934
+        }
+    ]
+}
