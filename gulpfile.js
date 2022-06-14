@@ -12,15 +12,18 @@ const axios         = require( 'axios' ); // make http requests
 // Default task is required but we don't use it for anything
 exports.default = cb => { cb(); };
 
+/**
+ * File locations
+ */
 const files = {
     serverLog: 'logs/VRisingServer.log',
     connectionLog: 'logs/connection_log_.*.text',
     cleanLog: 'clean-log.json'
 }
 
-const serverLog = 'logs/VRisingServer.log';
-const connectionLog = 'logs/connection_log_.*.text';
-
+/**
+ * RegExp patterns for finding users in the server log
+ */
 const serverLogSeachPatterns = {
     // group 1: session ID, group 2: steam ID, group 3: character name, group 4: character ID
     connect: /User '\{Steam ([0-9]+)\}' '([0-9]+)', approvedUserIndex: [0-9]+, Character: '([^']+)' connected as ID '[0-9,]*', Entity '([0-9]+),1'\./g,
@@ -28,6 +31,11 @@ const serverLogSeachPatterns = {
     disconnect: /User '{Steam ([0-9]+)}' disconnected\./g
 }
 
+/**
+ * Check if a string is a JSON structure
+ * @param {string} str 
+ * @returns boolean
+ */
 function hasJsonStructure( str ) {
     if (typeof str !== 'string') return false;
     try {
@@ -40,13 +48,23 @@ function hasJsonStructure( str ) {
     }
 }
 
+/**
+ * Change strings to numbers in regexp exec results
+ * @param {Array} results 
+ * @returns Array
+ */
 function numberfyRegExResults( results ) {
     return results.map( (r, i) => {
+        // if index is not 3, change string to number
         if( i !== 3 ) return parseInt( r );
         return r;
     } )
 }
 
+/**
+ * Find current status of all users from the server log
+ * @returns Promise
+ */
 function getUserInfoFromServerLog() {
     const users = [];
 
@@ -66,6 +84,7 @@ function getUserInfoFromServerLog() {
                 return;
             }
 
+            // find all instances of users connecting, add them to array or overwrite if present
             while( connection = re.exec( contents ) ) {
                 connection = numberfyRegExResults( connection );
                 uIdx = users.findIndex( user => user.steamId === connection[2] );
@@ -105,6 +124,10 @@ function getUserInfoFromServerLog() {
     });
 }
 
+/**
+ * Get the status of the server from the connection log
+ * @returns Promise
+ */
 function getServerStatusFromConnectionLog() {
     return new Promise( (resolve, reject) => {
         console.log( 'getting server status' );
@@ -112,6 +135,11 @@ function getServerStatusFromConnectionLog() {
     });
 }
 
+/**
+ * Update the clean log file with user info
+ * @param {Array} users 
+ * @returns 
+ */
 function updateCleanLog( users ) {
     return src( files.cleanLog )
         .pipe( chmod( {
@@ -124,6 +152,7 @@ function updateCleanLog( users ) {
             const log = hasJsonStructure( fileStr ) ? JSON.parse( fileStr ) : {};
             const storedUsers = log.users || [];
 
+            // account for users who were in the clean log previously but are not in the server log since restart
             storedUsers.forEach( su => {
                 if( !users.find( u => u.characterId === su.characterId ) ) {
                     su.statusOnline = false;
@@ -133,16 +162,30 @@ function updateCleanLog( users ) {
 
             log.users = users;
 
+            // update file
             file.contents = Buffer.from( JSON.stringify( log, null, '\t' ) );
 
         }))
         .pipe( dest( './' ) );
 }
 
+/**
+ * Gulp task for updating clean log
+ * @returns Promise
+ */
 function updateTask() {
 
     let users = [];
 
+    // if the clean log doesn't exist we need to create it
+    if( !fs.existsSync( files.cleanLog ) ) {
+        fs.writeFileSync( files.cleanLog, JSON.stringify({
+            users: [],
+            statusUp: false
+        }));
+    }
+
+    // update clean log from raw logs
     return getUserInfoFromServerLog()
     .then( u => {
         users = u;
