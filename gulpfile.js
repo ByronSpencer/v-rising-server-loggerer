@@ -17,18 +17,28 @@ exports.default = cb => { cb(); };
  */
 const files = {
     serverLog: 'logs/VRisingServer.log',
-    connectionLog: 'logs/connection_log_.*.text',
+    connectionLog: 'logs/connection_log_*.txt',
     cleanLog: 'clean-log.json'
 }
 
 /**
  * RegExp patterns for finding users in the server log
  */
-const serverLogSeachPatterns = {
+const userConnectionPatterns = {
     // group 1: session ID, group 2: steam ID, group 3: character name, group 4: character ID
     connect: /User '\{Steam ([0-9]+)\}' '([0-9]+)', approvedUserIndex: [0-9]+, Character: '([^']+)' connected as ID '[0-9,]*', Entity '([0-9]+),1'\./g,
     // group 1: session ID
     disconnect: /User '{Steam ([0-9]+)}' disconnected\./g
+}
+
+/**
+ * RegExp patterns for finding server connections in the connection log
+ */
+const serverStatusPatterns = {
+    // connection successful
+    online: /ConnectionCompleted\(/g,
+    // connection ended or failed
+    offline: /(AsyncDisconnect\()|(ConnectionDisconnected\()|(ConnectFailed\()/g
 }
 
 /**
@@ -77,7 +87,7 @@ function getUserInfoFromServerLog() {
             // user index
             let uIdx = -1;
             // check connections first and set initial statuses for each user
-            let re = new RegExp( serverLogSeachPatterns.connect );
+            let re = new RegExp( userConnectionPatterns.connect );
 
             if( err ) {
                 reject( err );
@@ -106,7 +116,7 @@ function getUserInfoFromServerLog() {
             }
     
             // now we check disconnects to see who is offline
-            re = new RegExp( serverLogSeachPatterns.disconnect );
+            re = new RegExp( userConnectionPatterns.disconnect );
             while( disconnection = re.exec( contents ) ) {
                 disconnection = numberfyRegExResults( disconnection );
                 uIdx = users.findIndex( user => user.lastSession === disconnection[1] );
@@ -129,9 +139,40 @@ function getUserInfoFromServerLog() {
  * @returns Promise
  */
 function getServerStatusFromConnectionLog() {
+    console.log( glob.sync( files.connectionLog ) )
     return new Promise( (resolve, reject) => {
-        console.log( 'getting server status' );
-        resolve( true );
+        fs.readFile( glob.sync( files.connectionLog )[0], {}, ( err, contents ) => {
+            // set initial status
+            let isOnline = false;
+            // last connection Index
+            let lastConnectionIndex = 0;
+            // connection search
+            let connection;
+            // disconnection search
+            let disconnection;
+            // check connections first
+            let re = new RegExp( serverStatusPatterns.online );
+
+            if( err ) {
+                reject( err );
+                return;
+            }
+
+            // find last successful connection
+            while( connection = re.exec( contents ) ) {
+                isOnline = true;
+                lastConnectionIndex = re.lastIndex;
+            }
+    
+            // now we check disconnects, if the last one is after the last connect, server is offline
+            re = new RegExp( serverStatusPatterns.offline );
+            while( disconnection = re.exec( contents ) ) {
+                if( re.lastIndex > lastConnectionIndex )
+                    isOnline = false;
+            }
+
+            resolve( isOnline );
+        });
     });
 }
 
@@ -140,7 +181,7 @@ function getServerStatusFromConnectionLog() {
  * @param {Array} users 
  * @returns 
  */
-function updateCleanLog( users ) {
+function updateCleanLog( users, server ) {
     return src( files.cleanLog )
         .pipe( chmod( {
             read: true,
@@ -161,6 +202,7 @@ function updateCleanLog( users ) {
             })
 
             log.users = users;
+            log.status = server;
 
             // update file
             file.contents = Buffer.from( JSON.stringify( log, null, '\t' ) );
@@ -176,12 +218,13 @@ function updateCleanLog( users ) {
 function updateTask() {
 
     let users = [];
+    let isServerOnline = false;
 
     // if the clean log doesn't exist we need to create it
     if( !fs.existsSync( files.cleanLog ) ) {
         fs.writeFileSync( files.cleanLog, JSON.stringify({
             users: [],
-            statusUp: false
+            status: false
         }));
     }
 
@@ -192,7 +235,8 @@ function updateTask() {
         return getServerStatusFromConnectionLog();
     })
     .then( s => {
-        return updateCleanLog( users );
+        isServerOnline = s;
+        return updateCleanLog( users, isServerOnline );
     });
 }
 
